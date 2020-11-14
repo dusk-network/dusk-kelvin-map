@@ -1,0 +1,7 @@
+[package]
+name = "dusk-kelvin-map"
+version = "0.1.0"
+authors = ["Victor Lopez <victor@dusk.network>"]
+edition = "2018"
+
+[dependencies]
