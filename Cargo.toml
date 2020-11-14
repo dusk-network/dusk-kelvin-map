@@ -5,3 +5,10 @@ authors = ["Victor Lopez <victor@dusk.network>"]
 edition = "2018"
 
 [dependencies]
+microkelvin =  { git = "https://github.com/dusk-network/microkelvin", branch = "vlopes11/two3-impl" }
+canonical = "0.4"
+canonical_derive = "0.4"
+
+[dev-dependencies]
+canonical_host = "0.4"
+rand = "0.7"
