@@ -1,5 +1,4 @@
-[![Build Status](https://travis-ci.com/dusk-network/dusk-kelvin-map.svg?branch=main)](https://travis-ci.com/dusk-network/dusk-kelvin-map)
-[![Repository](https://img.shields.io/badge/github-dusk-kelvin-map-blueviolet)](https://github.com/dusk-network/dusk-kelvin-map)
+[![Repository](https://img.shields.io/badge/github-dusk--kelvin--map-blueviolet)](https://github.com/dusk-network/dusk-kelvin-map)
 
 # Dusk Kelvin Map
 

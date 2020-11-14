@@ -17,6 +17,9 @@ use core::marker::PhantomData;
 /// Minimum working annotation for the KelvinMap.
 ///
 /// Internally contains a [`Max`] implementation for `K`.
+///
+/// The `Default` implementation of `K` will be considered as the negative infinity for the `Max`
+/// annotation.
 pub struct MapAnnotation<K, S>
 where
     K: Canon<S> + PartialOrd + Default,
