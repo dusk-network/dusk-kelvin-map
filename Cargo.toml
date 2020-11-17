@@ -3,6 +3,10 @@ name = "dusk-kelvin-map"
 version = "0.1.0"
 authors = ["Victor Lopez <victor@dusk.network>"]
 edition = "2018"
+description = "BST Map implementation with Microkelvin backend"
+repository = "https://github.com/dusk-network/dusk-kelvin-map"
+readme = "README.md"
+categories = ["data-structures", "embedded", "no-std", "wasm"]
 
 [dependencies]
 microkelvin = "0.5" 
