@@ -6,6 +6,7 @@ edition = "2018"
 description = "BST Map implementation with Microkelvin backend"
 repository = "https://github.com/dusk-network/dusk-kelvin-map"
 readme = "README.md"
+license = "MPL-2.0"
 categories = ["data-structures", "embedded", "no-std", "wasm"]
 
 [dependencies]
