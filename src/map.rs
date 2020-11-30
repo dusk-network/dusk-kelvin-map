@@ -85,6 +85,14 @@ where
     A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
     S: Store,
 {
+    /// Check if the map is empty
+    pub fn is_empty(&self) -> bool {
+        match self {
+            KelvinMap::Empty => true,
+            _ => false,
+        }
+    }
+
     /// Fetch a previously inserted key -> value mapping, provided the key.
     ///
     /// Will return `Ok(None)` if no correspondent key was found.
@@ -126,7 +134,7 @@ where
     ///
     /// If the key was previously mapped, it will return the old value in the form `Ok(Some(V))`.
     ///
-    /// If the key was not previously mappen, the return will be `Ok(None)`
+    /// If the key was not previously mapped, the return will be `Ok(None)`
     pub fn insert(&mut self, k: K, v: V) -> Result<Option<V>, S::Error> {
         self._insert(Leaf::new(k, v))
     }
@@ -168,5 +176,67 @@ where
         }
 
         Ok(old)
+    }
+
+    /// Remove a key -> value mapping from the set.
+    ///
+    /// If the key was previously mapped, it will return the old value in the form `Ok(Some(V))`.
+    ///
+    /// If the key was not previously mapped, the return will be `Ok(None)`. This operation is
+    /// idempotent.
+    pub fn remove(&mut self, k: &K) -> Result<Option<V>, S::Error> {
+        match self {
+            KelvinMap::Empty => Ok(None),
+
+            KelvinMap::Leaf(leaf) if leaf.key() == k => {
+                let old = Some(leaf.value().clone());
+
+                *self = KelvinMap::Empty;
+
+                Ok(old)
+            }
+            KelvinMap::Leaf(_) => Ok(None),
+
+            KelvinMap::Node(l, r) => {
+                let mut old = None;
+
+                // If the key is the left child, take its value and move the right child to current
+                // node
+                if let KelvinMap::Leaf(leaf) = &mut *l.val_mut()? {
+                    if leaf.key() == k {
+                        old.replace(leaf.value().clone());
+                    }
+                }
+
+                if old.is_some() {
+                    let new = mem::take(&mut *r.val_mut()?);
+                    *self = new;
+                    return Ok(old);
+                }
+
+                // If the key is the right child, take its value and move the left child to current
+                // node
+                if let KelvinMap::Leaf(leaf) = &mut *r.val_mut()? {
+                    if leaf.key() == k {
+                        old.replace(leaf.value().clone());
+                    }
+                }
+
+                if old.is_some() {
+                    let new = mem::take(&mut *l.val_mut()?);
+                    *self = new;
+                    return Ok(old);
+                }
+
+                // Traverse the tree
+                if l.annotation().borrow() >= k {
+                    l.val_mut()?.remove(k)
+                } else if r.annotation().borrow() >= k {
+                    r.val_mut()?.remove(k)
+                } else {
+                    Ok(None)
+                }
+            }
+        }
     }
 }

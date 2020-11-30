@@ -25,24 +25,31 @@ impl KeyValue {
             value: rng.next_u32(),
         }
     }
+
+    fn generate_map<const L: usize>() -> ([KeyValue; L], Map<u64, u32, MemStore>) {
+        // This seed will not generate duplicates
+        let mut rng = StdRng::seed_from_u64(2321u64);
+        let mut map = Map::default();
+
+        // Create a set of dummy random KeyValue
+        let mut data = [KeyValue::default(); L];
+        data.iter_mut()
+            .for_each(|l| *l = KeyValue::random(&mut rng));
+
+        data.iter().for_each(|d| {
+            assert!(map.insert(d.key, d.value).unwrap().is_none());
+            assert_eq!(d.value, map.get(&d.key).unwrap().unwrap());
+        });
+
+        (data, map)
+    }
 }
 
 #[test]
 fn insert_get_mutate() {
-    // This seed will not generate duplicates
-    let mut rng = StdRng::seed_from_u64(2321u64);
-    let mut map: Map<u64, u32, MemStore> = Map::default();
-
-    // Create a huge set of dummy random KeyValue
-    const M: usize = u16::max_value() as usize;
-    let mut data = [KeyValue::default(); M];
-    data.iter_mut()
-        .for_each(|l| *l = KeyValue::random(&mut rng));
-
-    data.iter().for_each(|d| {
-        assert!(map.insert(d.key, d.value).unwrap().is_none());
-        assert_eq!(d.value, map.get(&d.key).unwrap().unwrap());
-    });
+    // Generate a huge set
+    const L: usize = i16::MAX as usize;
+    let (data, mut map) = KeyValue::generate_map::<L>();
 
     data.iter().for_each(|d| {
         let k = d.key;
@@ -65,4 +72,41 @@ fn insert_get_mutate() {
             .unwrap();
         assert_eq!(v, x);
     });
+}
+
+#[test]
+fn remove_null() {
+    // This seed will not generate duplicates
+    let mut rng = StdRng::seed_from_u64(2321u64);
+    let mut map: Map<u64, u32, MemStore> = Map::default();
+
+    let kv = KeyValue::random(&mut rng);
+    assert_eq!(Ok(None), map.remove(&kv.key));
+}
+
+#[test]
+fn remove_single() {
+    let (data, mut map) = KeyValue::generate_map::<1>();
+
+    let v = map.remove(&data[0].key).unwrap().unwrap();
+    assert_eq!(data[0].value, v);
+
+    assert!(map.remove(&data[0].key).unwrap().is_none());
+    assert!(map.is_empty());
+}
+
+#[test]
+fn remove_multiple() {
+    const L: usize = u8::MAX as usize;
+    let (data, mut map) = KeyValue::generate_map::<L>();
+
+    let mut k = (L - 2) as usize;
+    while k > 0 {
+        let v = map.remove(&data[k].key).unwrap().unwrap();
+
+        assert_eq!(data[k].value, v);
+        assert!(map.remove(&data[k].key).unwrap().is_none());
+
+        k /= 2;
+    }
 }
