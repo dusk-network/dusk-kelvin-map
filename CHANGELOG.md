@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 30-11-20
+### Added
+- Implement `remove` method for Map.
+
 ## [0.1.0] - 14-11-20
 ### Added
 - Initial implementation of map-like BST.

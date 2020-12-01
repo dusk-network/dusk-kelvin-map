@@ -6,6 +6,7 @@
 
 #![no_std]
 #![feature(external_doc)]
+#![feature(min_const_generics)]
 #![doc(include = "../README.md")]
 #![warn(missing_docs)]
 
