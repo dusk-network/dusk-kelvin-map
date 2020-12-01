@@ -13,6 +13,18 @@ use microkelvin::{Annotation, Max};
 use core::borrow::Borrow;
 use core::marker::PhantomData;
 
+/// Trait requirement to be an annotation of `KelvinMap`.
+///
+/// The borrowed `Max<K>` will be used to define the traversal path over the tree.
+pub trait MapAnnotation<K, V, S>
+where
+    K: Canon<S> + PartialOrd,
+    V: Canon<S>,
+    S: Store,
+    Self: Canon<S> + Annotation<KelvinMap<K, V, Self, S>, S> + Borrow<Max<K>>,
+{
+}
+
 #[derive(Debug, Clone, Canon)]
 /// Minimum working annotation for the KelvinMap.
 ///
@@ -20,7 +32,7 @@ use core::marker::PhantomData;
 ///
 /// The `Default` implementation of `K` will be considered as the negative infinity for the `Max`
 /// annotation.
-pub struct MapAnnotation<K, S>
+pub struct MapAnnotationDefault<K, S>
 where
     K: Canon<S> + PartialOrd + Default,
     S: Store,
@@ -29,7 +41,15 @@ where
     store: PhantomData<S>,
 }
 
-impl<K, S> Borrow<Max<K>> for MapAnnotation<K, S>
+impl<K, V, S> MapAnnotation<K, V, S> for MapAnnotationDefault<K, S>
+where
+    K: Canon<S> + PartialOrd + Default,
+    V: Canon<S>,
+    S: Store,
+{
+}
+
+impl<K, S> Borrow<Max<K>> for MapAnnotationDefault<K, S>
 where
     K: Canon<S> + PartialOrd + Default,
     S: Store,
@@ -39,7 +59,7 @@ where
     }
 }
 
-impl<K, S> Borrow<K> for MapAnnotation<K, S>
+impl<K, S> Borrow<K> for MapAnnotationDefault<K, S>
 where
     K: Canon<S> + PartialOrd + Default,
     S: Store,
@@ -53,7 +73,8 @@ where
     }
 }
 
-impl<K, V, S> Annotation<KelvinMap<K, V, MapAnnotation<K, S>, S>, S> for MapAnnotation<K, S>
+impl<K, V, S> Annotation<KelvinMap<K, V, MapAnnotationDefault<K, S>, S>, S>
+    for MapAnnotationDefault<K, S>
 where
     K: Canon<S> + PartialOrd + Default,
     V: Canon<S>,
@@ -70,7 +91,9 @@ where
 
     fn from_leaf(leaf: &Leaf<K, V>) -> Self {
         let max =
-            <Max<K> as Annotation<KelvinMap<K, V, MapAnnotation<K, S>, S>, S>>::from_leaf(leaf);
+            <Max<K> as Annotation<KelvinMap<K, V, MapAnnotationDefault<K, S>, S>, S>>::from_leaf(
+                leaf,
+            );
 
         Self {
             max,
@@ -78,9 +101,11 @@ where
         }
     }
 
-    fn from_node(node: &KelvinMap<K, V, MapAnnotation<K, S>, S>) -> Self {
+    fn from_node(node: &KelvinMap<K, V, MapAnnotationDefault<K, S>, S>) -> Self {
         let max =
-            <Max<K> as Annotation<KelvinMap<K, V, MapAnnotation<K, S>, S>, S>>::from_node(node);
+            <Max<K> as Annotation<KelvinMap<K, V, MapAnnotationDefault<K, S>, S>, S>>::from_node(
+                node,
+            );
 
         Self {
             max,

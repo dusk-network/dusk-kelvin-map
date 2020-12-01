@@ -4,13 +4,12 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-use crate::Leaf;
+use crate::{Leaf, MapAnnotation};
 
 use canonical::{Canon, InvalidEncoding, Store};
 use canonical_derive::Canon;
-use microkelvin::{Annotated, Annotation, Child, ChildMut, Compound, Max};
+use microkelvin::{Annotated, Child, ChildMut, Compound};
 
-use core::borrow::Borrow;
 use core::mem;
 
 #[derive(Debug, Clone, Canon)]
@@ -22,7 +21,7 @@ pub enum KelvinMap<K, V, A, S>
 where
     K: Canon<S> + PartialOrd,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
+    A: MapAnnotation<K, V, S>,
     S: Store,
 {
     /// Represents and empty endpoint
@@ -41,7 +40,7 @@ impl<K, V, A, S> Default for KelvinMap<K, V, A, S>
 where
     K: Canon<S> + PartialOrd,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
+    A: MapAnnotation<K, V, S>,
     S: Store,
 {
     fn default() -> Self {
@@ -53,7 +52,7 @@ impl<K, V, A, S> Compound<S> for KelvinMap<K, V, A, S>
 where
     V: Canon<S>,
     K: Canon<S> + PartialOrd,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
+    A: MapAnnotation<K, V, S>,
     S: Store,
 {
     type Leaf = Leaf<K, V>;
@@ -82,7 +81,7 @@ impl<K, V, A, S> KelvinMap<K, V, A, S>
 where
     K: Canon<S> + PartialOrd,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
+    A: MapAnnotation<K, V, S>,
     S: Store,
 {
     /// Check if the map is empty
