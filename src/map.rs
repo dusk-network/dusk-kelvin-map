@@ -8,8 +8,9 @@ use crate::{Leaf, MapAnnotation};
 
 use canonical::{Canon, InvalidEncoding, Store};
 use canonical_derive::Canon;
-use microkelvin::{Annotated, Child, ChildMut, Compound};
+use microkelvin::{Annotated, Child, ChildMut, Compound, Max};
 
+use core::borrow::Borrow;
 use core::mem;
 
 #[derive(Debug, Clone, Canon)]
@@ -19,7 +20,7 @@ use core::mem;
 /// be the maximum `K` contained in that sub-tree.
 pub enum KelvinMap<K, V, A, S>
 where
-    K: Canon<S> + PartialOrd,
+    K: Canon<S> + Ord,
     V: Canon<S>,
     A: MapAnnotation<K, V, S>,
     S: Store,
@@ -38,7 +39,7 @@ where
 
 impl<K, V, A, S> Default for KelvinMap<K, V, A, S>
 where
-    K: Canon<S> + PartialOrd,
+    K: Canon<S> + Ord,
     V: Canon<S>,
     A: MapAnnotation<K, V, S>,
     S: Store,
@@ -51,7 +52,7 @@ where
 impl<K, V, A, S> Compound<S> for KelvinMap<K, V, A, S>
 where
     V: Canon<S>,
-    K: Canon<S> + PartialOrd,
+    K: Canon<S> + Ord,
     A: MapAnnotation<K, V, S>,
     S: Store,
 {
@@ -77,9 +78,16 @@ where
     }
 }
 
+#[inline]
+fn borrow_max<K, A: Borrow<Max<K>>>(ann: &A) -> &Max<K> {
+    // Borrow does not accept generic parameters; this is a helper to relax the type resolution of
+    // the compiler
+    ann.borrow()
+}
+
 impl<K, V, A, S> KelvinMap<K, V, A, S>
 where
-    K: Canon<S> + PartialOrd,
+    K: Canon<S> + Ord,
     V: Canon<S>,
     A: MapAnnotation<K, V, S>,
     S: Store,
@@ -100,8 +108,8 @@ where
             KelvinMap::Empty => Ok(None),
             KelvinMap::Leaf(l) if l == k => Ok(Some(l.value().clone())),
             KelvinMap::Leaf(l) if l != k => Ok(None),
-            KelvinMap::Node(l, _) if l.annotation().borrow() >= k => l.val()?.get(k),
-            KelvinMap::Node(l, r) if l.annotation().borrow() < k => r.val()?.get(k),
+            KelvinMap::Node(l, _) if borrow_max(l.annotation()) >= k => l.val()?.get(k),
+            KelvinMap::Node(l, r) if borrow_max(l.annotation()) < k => r.val()?.get(k),
             _ => Err(InvalidEncoding.into()),
         }
     }
@@ -123,8 +131,8 @@ where
             KelvinMap::Empty => Ok(None),
             KelvinMap::Leaf(l) if l == k => Ok(Some(f(l.value_mut()))),
             KelvinMap::Leaf(l) if l != k => Ok(None),
-            KelvinMap::Node(l, _) if l.annotation().borrow() >= k => l.val_mut()?.map_mut(k, f),
-            KelvinMap::Node(l, r) if l.annotation().borrow() < k => r.val_mut()?.map_mut(k, f),
+            KelvinMap::Node(l, _) if borrow_max(l.annotation()) >= k => l.val_mut()?.map_mut(k, f),
+            KelvinMap::Node(l, r) if borrow_max(l.annotation()) < k => r.val_mut()?.map_mut(k, f),
             _ => Err(InvalidEncoding.into()),
         }
     }
@@ -163,11 +171,11 @@ where
                 *self = KelvinMap::Node(left, right);
             }
 
-            KelvinMap::Node(l, _) if l.annotation().borrow() >= leaf.key() => {
+            KelvinMap::Node(l, _) if borrow_max(l.annotation()) >= leaf.key() => {
                 old = l.val_mut()?._insert(leaf)?;
             }
 
-            KelvinMap::Node(l, r) if l.annotation().borrow() < leaf.key() => {
+            KelvinMap::Node(l, r) if borrow_max(l.annotation()) < leaf.key() => {
                 old = r.val_mut()?._insert(leaf)?;
             }
 
@@ -228,9 +236,9 @@ where
                 }
 
                 // Traverse the tree
-                if l.annotation().borrow() >= k {
+                if borrow_max(l.annotation()) >= k {
                     l.val_mut()?.remove(k)
-                } else if r.annotation().borrow() >= k {
+                } else if borrow_max(r.annotation()) >= k {
                     r.val_mut()?.remove(k)
                 } else {
                     Ok(None)
