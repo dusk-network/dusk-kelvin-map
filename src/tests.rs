@@ -110,3 +110,63 @@ fn remove_multiple() {
         k /= 2;
     }
 }
+
+#[test]
+fn balance() {
+    use crate::KelvinMap;
+    use core::borrow::Borrow;
+    use microkelvin::Cardinality;
+
+    let mut map: Map<u8, u8, MemStore> = Map::default();
+
+    // Ordered inserting is a worst case scenario for a BST
+    for v in 0..130 {
+        map.insert(v, v.wrapping_mul(3)).unwrap();
+    }
+
+    let (l, r) = match map {
+        KelvinMap::Node(l, r) => (l, r),
+        _ => panic!("Inconsistent tree after append!"),
+    };
+
+    let c_l: &Cardinality = l.annotation().borrow();
+    let c_l: u64 = c_l.into();
+    let c_l: i32 = c_l as i32;
+
+    let c_r: &Cardinality = r.annotation().borrow();
+    let c_r: u64 = c_r.into();
+    let c_r: i32 = c_r as i32;
+
+    // Assert they have equivalent cardinality for worst case scenario
+    assert!((c_l - c_r).abs() <= 2);
+}
+
+#[test]
+fn balance_rev() {
+    use crate::KelvinMap;
+    use core::borrow::Borrow;
+    use microkelvin::Cardinality;
+
+    let mut map: Map<u8, u8, MemStore> = Map::default();
+
+    // Reverse order inserting is a worst case scenario for a BST
+    for v in 0..130 {
+        map.insert(130 - v, v.wrapping_mul(3)).unwrap();
+    }
+
+    let (l, r) = match map {
+        KelvinMap::Node(l, r) => (l, r),
+        _ => panic!("Inconsistent tree after append!"),
+    };
+
+    let c_l: &Cardinality = l.annotation().borrow();
+    let c_l: u64 = c_l.into();
+    let c_l: i32 = c_l as i32;
+
+    let c_r: &Cardinality = r.annotation().borrow();
+    let c_r: u64 = c_r.into();
+    let c_r: i32 = c_r as i32;
+
+    // Assert they have equivalent cardinality for worst case scenario
+    assert!((c_l - c_r).abs() <= 2);
+}

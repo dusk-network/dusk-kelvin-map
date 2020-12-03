@@ -4,7 +4,9 @@
 
 Binary search tree implementation with no associated value on the nodes.
 
-It will extend the standard properties of a default BST. The worst case scenario time complexity for inserting and searching is `O(n)`.
+It will extend the standard properties of a default BST.
+
+There is a naive balance implementation that will compare the cardinality of the left and right nodes of a tree before inserting. If there is a discrepancy, one minimum/maximum leaf will be swapped, according to the discrepancy. This will progressively balance the tree in every insert operation.
 
 This map-like implementation uses Microkelvin as backend and is optimized to work under constrained/hosted environments such as WASM runtimes.
 
