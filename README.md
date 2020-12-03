@@ -1,4 +1,5 @@
 [![Repository](https://img.shields.io/badge/github-dusk--kelvin--map-blueviolet)](https://github.com/dusk-network/dusk-kelvin-map)
+[![Docs](https://img.shields.io/badge/docs--rs-dusk--kelvin--map-blue)](https://docs.rs/dusk-kelvin-map)
 
 # Dusk Kelvin Map
 
@@ -6,9 +7,9 @@ Binary search tree implementation with no associated value on the nodes.
 
 It will extend the standard properties of a default BST.
 
-There is a naive balance implementation that will compare the cardinality of the left and right nodes of a tree before inserting. If there is a discrepancy, one minimum/maximum leaf will be swapped, according to the discrepancy. This will progressively balance the tree in every insert operation.
+There is a naive balance implementation that will compare the cardinality of the left and right nodes of a tree before any mutation of the map (insert / remove). If there is a discrepancy, one minimum/maximum leaf will be swapped, according to the discrepancy. This will progressively balance the tree.
 
-This map-like implementation uses Microkelvin as backend and is optimized to work under constrained/hosted environments such as WASM runtimes.
+This implementation uses Microkelvin as backend and is optimized to work under constrained/hosted environments such as WASM runtimes.
 
 ## Example
 

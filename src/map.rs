@@ -92,6 +92,25 @@ where
     A: MapAnnotation<K, V, S>,
     S: Store,
 {
+    /// Returns the number of elements in the map.
+    pub fn len(&self) -> usize {
+        match self {
+            KelvinMap::Empty => 0,
+            KelvinMap::Leaf(_) => 1,
+            KelvinMap::Node(l, r) => {
+                let c_l: &Cardinality = l.annotation().borrow();
+                let c_l: u64 = c_l.into();
+                let c_l = c_l as usize;
+
+                let c_r: &Cardinality = r.annotation().borrow();
+                let c_r: u64 = c_r.into();
+                let c_r = c_r as usize;
+
+                c_l + c_r
+            }
+        }
+    }
+
     /// Check if the map is empty
     pub fn is_empty(&self) -> bool {
         match self {
@@ -159,6 +178,37 @@ where
         }
     }
 
+    /// Balance the map
+    fn balance(&mut self) -> Result<(), S::Error> {
+        let (l, r) = match self {
+            KelvinMap::Node(l, r) => (l, r),
+            _ => return Ok(()),
+        };
+
+        let c_l: &Cardinality = l.annotation().borrow();
+        let c_l: u64 = c_l.into();
+
+        let c_r: &Cardinality = r.annotation().borrow();
+        let c_r: u64 = c_r.into();
+
+        // TODO - Improve the performance with a tree rotation
+        if c_r > c_l.saturating_add(1) {
+            // Find the smallest element in `r`, remove it and append to `l`
+            if let Some(leaf) = r.val()?.min_key_leaf()? {
+                r.val_mut()?.remove(leaf.key())?;
+                l.val_mut()?._insert(leaf)?;
+            }
+        } else if c_l > c_r.saturating_add(1) {
+            // Find the biggest element in `l`, remove it and append to `r`
+            if let Some(leaf) = l.val()?.max_key_leaf()? {
+                l.val_mut()?.remove(leaf.key())?;
+                r.val_mut()?._insert(leaf)?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Include a key -> value mapping to the set.
     ///
     /// If the key was previously mapped, it will return the old value in the form `Ok(Some(V))`.
@@ -170,29 +220,7 @@ where
     pub fn insert(&mut self, k: K, v: V) -> Result<Option<V>, S::Error> {
         let leaf = Leaf::new(k, v);
 
-        // Balance the tree
-        if let KelvinMap::Node(l, r) = self {
-            let c_l: &Cardinality = l.annotation().borrow();
-            let c_l: u64 = c_l.into();
-
-            let c_r: &Cardinality = r.annotation().borrow();
-            let c_r: u64 = c_r.into();
-
-            // TODO - Improve the performance with a tree rotation
-            if c_r > c_l.saturating_add(1) {
-                // Find the smallest element in `r`, remove it and append to `l`
-                if let Some(leaf) = r.val()?.min_key_leaf()? {
-                    r.val_mut()?.remove(leaf.key())?;
-                    l.val_mut()?._insert(leaf)?;
-                }
-            } else if c_l > c_r.saturating_add(1) {
-                // Find the biggest element in `l`, remove it and append to `r`
-                if let Some(leaf) = l.val()?.max_key_leaf()? {
-                    l.val_mut()?.remove(leaf.key())?;
-                    r.val_mut()?._insert(leaf)?;
-                }
-            }
-        }
+        self.balance()?;
 
         self._insert(leaf)
     }
@@ -243,9 +271,11 @@ where
     /// If the key was not previously mapped, the return will be `Ok(None)`. This operation is
     /// idempotent.
     ///
-    /// The remove operation will not re-balance the tree. It will be balanced as new elements are
-    /// appended.
+    /// Internally, a naive balancing will be performed. If the tree contains more elements on the
+    /// left, it will move the maximum key of the left to the right - and vice-versa.
     pub fn remove(&mut self, k: &K) -> Result<Option<V>, S::Error> {
+        self.balance()?;
+
         match self {
             KelvinMap::Empty => Ok(None),
 
