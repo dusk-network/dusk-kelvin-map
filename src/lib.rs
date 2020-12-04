@@ -4,13 +4,13 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 #![feature(external_doc)]
 #![feature(min_const_generics)]
 #![doc(include = "../README.md")]
 #![warn(missing_docs)]
 
-pub use annotation::MapAnnotation;
+pub use annotation::{MapAnnotation, MapAnnotationDefault};
 pub use leaf::Leaf;
 pub use map::KelvinMap;
 
@@ -21,5 +21,5 @@ mod map;
 #[cfg(test)]
 mod tests;
 
-/// [`KelvinMap`] default implementation using the minimal [`MapAnnotation`]
-pub type Map<K, V, S> = KelvinMap<K, V, MapAnnotation<K, S>, S>;
+/// [`KelvinMap`] default implementation using the minimal [`MapAnnotationDefault`]
+pub type Map<K, V, S> = KelvinMap<K, V, MapAnnotationDefault<K, S>, S>;

@@ -4,11 +4,11 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-use crate::Leaf;
+use crate::{Leaf, MapAnnotation};
 
 use canonical::{Canon, InvalidEncoding, Store};
 use canonical_derive::Canon;
-use microkelvin::{Annotated, Annotation, Child, ChildMut, Compound, Max};
+use microkelvin::{Annotated, Cardinality, Child, ChildMut, Compound, Max};
 
 use core::borrow::Borrow;
 use core::mem;
@@ -20,9 +20,9 @@ use core::mem;
 /// be the maximum `K` contained in that sub-tree.
 pub enum KelvinMap<K, V, A, S>
 where
-    K: Canon<S> + PartialOrd,
+    K: Canon<S> + Ord,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
+    A: MapAnnotation<K, V, S>,
     S: Store,
 {
     /// Represents and empty endpoint
@@ -39,9 +39,9 @@ where
 
 impl<K, V, A, S> Default for KelvinMap<K, V, A, S>
 where
-    K: Canon<S> + PartialOrd,
+    K: Canon<S> + Ord,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
+    A: MapAnnotation<K, V, S>,
     S: Store,
 {
     fn default() -> Self {
@@ -52,8 +52,8 @@ where
 impl<K, V, A, S> Compound<S> for KelvinMap<K, V, A, S>
 where
     V: Canon<S>,
-    K: Canon<S> + PartialOrd,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
+    K: Canon<S> + Ord,
+    A: MapAnnotation<K, V, S>,
     S: Store,
 {
     type Leaf = Leaf<K, V>;
@@ -78,13 +78,39 @@ where
     }
 }
 
+#[inline]
+fn borrow_max<K, A: Borrow<Max<K>>>(ann: &A) -> &Max<K> {
+    // Borrow does not accept generic parameters; this is a helper to relax the type resolution of
+    // the compiler
+    ann.borrow()
+}
+
 impl<K, V, A, S> KelvinMap<K, V, A, S>
 where
-    K: Canon<S> + PartialOrd,
+    K: Canon<S> + Ord,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
+    A: MapAnnotation<K, V, S>,
     S: Store,
 {
+    /// Returns the number of elements in the map.
+    pub fn len(&self) -> usize {
+        match self {
+            KelvinMap::Empty => 0,
+            KelvinMap::Leaf(_) => 1,
+            KelvinMap::Node(l, r) => {
+                let c_l: &Cardinality = l.annotation().borrow();
+                let c_l: u64 = c_l.into();
+                let c_l = c_l as usize;
+
+                let c_r: &Cardinality = r.annotation().borrow();
+                let c_r: u64 = c_r.into();
+                let c_r = c_r as usize;
+
+                c_l + c_r
+            }
+        }
+    }
+
     /// Check if the map is empty
     pub fn is_empty(&self) -> bool {
         match self {
@@ -101,8 +127,8 @@ where
             KelvinMap::Empty => Ok(None),
             KelvinMap::Leaf(l) if l == k => Ok(Some(l.value().clone())),
             KelvinMap::Leaf(l) if l != k => Ok(None),
-            KelvinMap::Node(l, _) if l.annotation().borrow() >= k => l.val()?.get(k),
-            KelvinMap::Node(l, r) if l.annotation().borrow() < k => r.val()?.get(k),
+            KelvinMap::Node(l, _) if borrow_max(l.annotation()) >= k => l.val()?.get(k),
+            KelvinMap::Node(l, r) if borrow_max(l.annotation()) < k => r.val()?.get(k),
             _ => Err(InvalidEncoding.into()),
         }
     }
@@ -124,10 +150,63 @@ where
             KelvinMap::Empty => Ok(None),
             KelvinMap::Leaf(l) if l == k => Ok(Some(f(l.value_mut()))),
             KelvinMap::Leaf(l) if l != k => Ok(None),
-            KelvinMap::Node(l, _) if l.annotation().borrow() >= k => l.val_mut()?.map_mut(k, f),
-            KelvinMap::Node(l, r) if l.annotation().borrow() < k => r.val_mut()?.map_mut(k, f),
+            KelvinMap::Node(l, _) if borrow_max(l.annotation()) >= k => l.val_mut()?.map_mut(k, f),
+            KelvinMap::Node(l, r) if borrow_max(l.annotation()) < k => r.val_mut()?.map_mut(k, f),
             _ => Err(InvalidEncoding.into()),
         }
+    }
+
+    /// Traverse the tree to find the minimum leaf-key
+    fn min_key_leaf(&self) -> Result<Option<Leaf<K, V>>, S::Error> {
+        match self {
+            KelvinMap::Empty => Ok(None),
+
+            KelvinMap::Leaf(l) => Ok(Some(l.clone())),
+
+            KelvinMap::Node(l, _) => l.val()?.min_key_leaf(),
+        }
+    }
+
+    /// Traverse the tree to find the maximum leaf-key
+    fn max_key_leaf(&self) -> Result<Option<Leaf<K, V>>, S::Error> {
+        match self {
+            KelvinMap::Empty => Ok(None),
+
+            KelvinMap::Leaf(l) => Ok(Some(l.clone())),
+
+            KelvinMap::Node(_, r) => r.val()?.max_key_leaf(),
+        }
+    }
+
+    /// Balance the map
+    fn balance(&mut self) -> Result<(), S::Error> {
+        let (l, r) = match self {
+            KelvinMap::Node(l, r) => (l, r),
+            _ => return Ok(()),
+        };
+
+        let c_l: &Cardinality = l.annotation().borrow();
+        let c_l: u64 = c_l.into();
+
+        let c_r: &Cardinality = r.annotation().borrow();
+        let c_r: u64 = c_r.into();
+
+        // TODO - Improve the performance with a tree rotation
+        if c_r > c_l.saturating_add(1) {
+            // Find the smallest element in `r`, remove it and append to `l`
+            if let Some(leaf) = r.val()?.min_key_leaf()? {
+                r.val_mut()?.remove(leaf.key())?;
+                l.val_mut()?._insert(leaf)?;
+            }
+        } else if c_l > c_r.saturating_add(1) {
+            // Find the biggest element in `l`, remove it and append to `r`
+            if let Some(leaf) = l.val()?.max_key_leaf()? {
+                l.val_mut()?.remove(leaf.key())?;
+                r.val_mut()?._insert(leaf)?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Include a key -> value mapping to the set.
@@ -135,8 +214,15 @@ where
     /// If the key was previously mapped, it will return the old value in the form `Ok(Some(V))`.
     ///
     /// If the key was not previously mapped, the return will be `Ok(None)`
+    ///
+    /// Internally, a naive balancing will be performed. If the tree contains more elements on the
+    /// left, it will move the maximum key of the left to the right - and vice-versa.
     pub fn insert(&mut self, k: K, v: V) -> Result<Option<V>, S::Error> {
-        self._insert(Leaf::new(k, v))
+        let leaf = Leaf::new(k, v);
+
+        self.balance()?;
+
+        self._insert(leaf)
     }
 
     fn _insert(&mut self, leaf: Leaf<K, V>) -> Result<Option<V>, S::Error> {
@@ -164,11 +250,11 @@ where
                 *self = KelvinMap::Node(left, right);
             }
 
-            KelvinMap::Node(l, _) if l.annotation().borrow() >= leaf.key() => {
+            KelvinMap::Node(l, _) if borrow_max(l.annotation()) >= leaf.key() => {
                 old = l.val_mut()?._insert(leaf)?;
             }
 
-            KelvinMap::Node(l, r) if l.annotation().borrow() < leaf.key() => {
+            KelvinMap::Node(l, r) if borrow_max(l.annotation()) < leaf.key() => {
                 old = r.val_mut()?._insert(leaf)?;
             }
 
@@ -184,7 +270,12 @@ where
     ///
     /// If the key was not previously mapped, the return will be `Ok(None)`. This operation is
     /// idempotent.
+    ///
+    /// Internally, a naive balancing will be performed. If the tree contains more elements on the
+    /// left, it will move the maximum key of the left to the right - and vice-versa.
     pub fn remove(&mut self, k: &K) -> Result<Option<V>, S::Error> {
+        self.balance()?;
+
         match self {
             KelvinMap::Empty => Ok(None),
 
@@ -229,9 +320,9 @@ where
                 }
 
                 // Traverse the tree
-                if l.annotation().borrow() >= k {
+                if borrow_max(l.annotation()) >= k {
                     l.val_mut()?.remove(k)
-                } else if r.annotation().borrow() >= k {
+                } else if borrow_max(r.annotation()) >= k {
                     r.val_mut()?.remove(k)
                 } else {
                     Ok(None)

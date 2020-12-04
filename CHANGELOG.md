@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 03-12-20
+### Added
+- Balance the map on insert/remove.
+
 ## [0.1.1] - 30-11-20
 ### Added
 - Implement `remove` method for Map.

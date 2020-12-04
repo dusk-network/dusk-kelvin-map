@@ -14,7 +14,7 @@ use core::cmp::Ordering;
 /// Wrapper for the key -> value mapping the will act as leaf of the tree
 pub struct Leaf<K, V>
 where
-    K: PartialOrd,
+    K: Ord,
 {
     key: K,
     value: V,
@@ -22,7 +22,7 @@ where
 
 impl<K, V> Leaf<K, V>
 where
-    K: PartialOrd,
+    K: Ord,
 {
     pub(crate) fn new(key: K, value: V) -> Self {
         Self { key, value }
@@ -46,7 +46,7 @@ where
 
 impl<K, V> PartialEq<K> for Leaf<K, V>
 where
-    K: PartialOrd,
+    K: Ord,
 {
     fn eq(&self, rhs: &K) -> bool {
         self.key.eq(rhs)
@@ -55,7 +55,7 @@ where
 
 impl<K, V> PartialOrd<K> for Leaf<K, V>
 where
-    K: PartialOrd,
+    K: Ord,
 {
     fn partial_cmp(&self, rhs: &K) -> Option<Ordering> {
         self.key.partial_cmp(rhs)
@@ -64,7 +64,7 @@ where
 
 impl<K, V> PartialEq for Leaf<K, V>
 where
-    K: PartialOrd,
+    K: Ord,
 {
     fn eq(&self, rhs: &Self) -> bool {
         self.key.eq(&rhs.key)
@@ -73,7 +73,7 @@ where
 
 impl<K, V> PartialOrd for Leaf<K, V>
 where
-    K: PartialOrd,
+    K: Ord,
 {
     fn partial_cmp(&self, rhs: &Self) -> Option<Ordering> {
         self.key.partial_cmp(&rhs.key)
@@ -82,7 +82,7 @@ where
 
 impl<K, V> Borrow<K> for Leaf<K, V>
 where
-    K: PartialOrd,
+    K: Ord,
 {
     fn borrow(&self) -> &K {
         &self.key
