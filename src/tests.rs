@@ -21,6 +21,7 @@ struct KeyValue {
     pub key: u64,
     pub value: u32,
 }
+
 impl KeyValue {
     fn random<R: RngCore>(rng: &mut R) -> Self {
         Self {
@@ -29,15 +30,17 @@ impl KeyValue {
         }
     }
 
-    fn generate_map<const L: usize>() -> ([KeyValue; L], Map<u64, u32, MemStore>) {
+    fn generate_map<const L: usize>() -> (Vec<KeyValue>, Map<u64, u32, MemStore>) {
         // This seed will not generate duplicates
         let mut rng = StdRng::seed_from_u64(2321u64);
         let mut map = Map::default();
 
         // Create a set of dummy random KeyValue
-        let mut data = [KeyValue::default(); L];
-        data.iter_mut()
-            .for_each(|l| *l = KeyValue::random(&mut rng));
+        let mut data = vec![];
+
+        for _ in 0..L {
+            data.push(KeyValue::random(&mut rng));
+        }
 
         data.iter().for_each(|d| {
             assert!(map.insert(d.key, d.value).unwrap().is_none());
