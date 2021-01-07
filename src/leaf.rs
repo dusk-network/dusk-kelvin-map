@@ -4,18 +4,15 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
+use core::borrow::Borrow;
+use core::ops::{Deref, DerefMut};
+
 use canonical::Canon;
 use canonical_derive::Canon;
 
-use core::borrow::Borrow;
-use core::cmp::Ordering;
-
 #[derive(Debug, Clone, Canon)]
 /// Wrapper for the key -> value mapping the will act as leaf of the tree
-pub struct Leaf<K, V>
-where
-    K: Ord,
-{
+pub struct Leaf<K, V> {
     key: K,
     value: V,
 }
@@ -44,47 +41,25 @@ where
     }
 }
 
-impl<K, V> PartialEq<K> for Leaf<K, V>
-where
-    K: Ord,
-{
-    fn eq(&self, rhs: &K) -> bool {
-        self.key.eq(rhs)
-    }
-}
-
-impl<K, V> PartialOrd<K> for Leaf<K, V>
-where
-    K: Ord,
-{
-    fn partial_cmp(&self, rhs: &K) -> Option<Ordering> {
-        self.key.partial_cmp(rhs)
-    }
-}
-
-impl<K, V> PartialEq for Leaf<K, V>
-where
-    K: Ord,
-{
-    fn eq(&self, rhs: &Self) -> bool {
-        self.key.eq(&rhs.key)
-    }
-}
-
-impl<K, V> PartialOrd for Leaf<K, V>
-where
-    K: Ord,
-{
-    fn partial_cmp(&self, rhs: &Self) -> Option<Ordering> {
-        self.key.partial_cmp(&rhs.key)
-    }
-}
-
 impl<K, V> Borrow<K> for Leaf<K, V>
 where
     K: Ord,
 {
     fn borrow(&self) -> &K {
         &self.key
+    }
+}
+
+impl<K, V> Deref for Leaf<K, V> {
+    type Target = V;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<K, V> DerefMut for Leaf<K, V> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
     }
 }
