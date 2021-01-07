@@ -6,7 +6,6 @@
 
 #![cfg_attr(not(test), no_std)]
 #![feature(external_doc)]
-#![feature(min_const_generics)]
 #![doc(include = "../README.md")]
 #![warn(missing_docs)]
 
@@ -21,5 +20,6 @@ mod map;
 #[cfg(test)]
 mod tests;
 
-/// [`KelvinMap`] default implementation using the minimal [`MapAnnotationDefault`]
-pub type Map<K, V, S> = KelvinMap<K, V, MapAnnotationDefault<K, S>, S>;
+/// [`KelvinMap`] default implementation using the minimal [`MapAnnotation`]
+pub type Map<K, V, S, const N: usize> =
+    KelvinMap<K, V, MapAnnotationDefault<K, S>, S, N>;

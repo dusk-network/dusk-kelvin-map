@@ -15,6 +15,8 @@ use microkelvin::Cardinality;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 
+const MAX_DEPTH: usize = 16;
+
 /// Simple key-value pair wrapper
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Canon)]
 struct KeyValue {
@@ -30,7 +32,8 @@ impl KeyValue {
         }
     }
 
-    fn generate_map<const L: usize>() -> (Vec<KeyValue>, Map<u64, u32, MemStore>) {
+    fn generate_map<const L: usize>(
+    ) -> (Vec<KeyValue>, Map<u64, u32, MemStore, MAX_DEPTH>) {
         // This seed will not generate duplicates
         let mut rng = StdRng::seed_from_u64(2321u64);
         let mut map = Map::default();
@@ -44,14 +47,14 @@ impl KeyValue {
 
         data.iter().for_each(|d| {
             assert!(map.insert(d.key, d.value).unwrap().is_none());
-            assert_eq!(d.value, map.get(&d.key).unwrap().unwrap());
+            assert_eq!(d.value, *map.get(&d.key).unwrap().unwrap());
         });
 
         (data, map)
     }
 }
 
-fn assert_balanced<K, V, S>(map: &Map<K, V, S>)
+fn assert_balanced<K, V, S, const N: usize>(map: &Map<K, V, S, N>)
 where
     K: Canon<S> + Ord + Default,
     V: Canon<S>,
@@ -75,41 +78,31 @@ where
 }
 
 #[test]
-fn insert_get_mutate() {
-    // Generate a huge set
-    const L: usize = i16::MAX as usize;
-    let (data, mut map) = KeyValue::generate_map::<L>();
+fn insert_get_mut() {
+    let n = 16;
+
+    let mut map: Map<u64, u64, MemStore, MAX_DEPTH> = Map::default();
+
+    for i in 0..n {
+        map.insert(i, i).unwrap();
+    }
+
+    for i in 0..n {
+        *map.get_mut(&i).unwrap().unwrap() += 1;
+    }
 
     assert_balanced(&map);
 
-    data.iter().for_each(|d| {
-        let k = d.key;
-        let mut v = d.value;
-
-        assert_eq!(v, map.get(&k).unwrap().unwrap());
-
-        let old = v;
-        v /= 2;
-        assert_eq!(old, map.insert(k, v).unwrap().unwrap());
-        assert_eq!(v, map.get(&k).unwrap().unwrap());
-
-        v = v.saturating_add(1);
-        let x = map
-            .map_mut(&k, |x| {
-                *x = x.saturating_add(1);
-                *x
-            })
-            .unwrap()
-            .unwrap();
-        assert_eq!(v, x);
-    });
+    for i in 0..n {
+        assert_eq!(*map.get(&i).unwrap().unwrap(), i + 1)
+    }
 }
 
 #[test]
 fn remove_null() {
     // This seed will not generate duplicates
     let mut rng = StdRng::seed_from_u64(2321u64);
-    let mut map: Map<u64, u32, MemStore> = Map::default();
+    let mut map: Map<u64, u32, MemStore, MAX_DEPTH> = Map::default();
 
     let kv = KeyValue::random(&mut rng);
     assert_eq!(Ok(None), map.remove(&kv.key));
@@ -146,7 +139,7 @@ fn remove_multiple() {
 
 #[test]
 fn balance() {
-    let mut map: Map<u8, u8, MemStore> = Map::default();
+    let mut map: Map<u8, u8, MemStore, MAX_DEPTH> = Map::default();
 
     // Ordered inserting is a worst case scenario for a BST
     for v in 0..130 {
@@ -158,7 +151,7 @@ fn balance() {
 
 #[test]
 fn balance_rev() {
-    let mut map: Map<u8, u8, MemStore> = Map::default();
+    let mut map: Map<u8, u8, MemStore, MAX_DEPTH> = Map::default();
 
     // Reverse order inserting is a worst case scenario for a BST
     for v in 0..130 {

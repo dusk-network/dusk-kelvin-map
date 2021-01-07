@@ -6,23 +6,27 @@
 
 use crate::{Leaf, MapAnnotation};
 
-use canonical::{Canon, InvalidEncoding, Store};
-use canonical_derive::Canon;
-use microkelvin::{Annotated, Cardinality, Child, ChildMut, Compound, Max};
-
 use core::borrow::Borrow;
 use core::mem;
+use core::ops::{Deref, DerefMut};
+
+use canonical::{Canon, InvalidEncoding, Store};
+use canonical_derive::Canon;
+use microkelvin::{
+    Annotated, Annotation, Branch, BranchMut, Cardinality, Child, ChildMut,
+    Compound, Max, Step, StepMut, Walk, WalkMut,
+};
 
 #[derive(Debug, Clone, Canon)]
 /// Binary tree map-like implementation with Microkelvin set as backend
 ///
 /// The borrowed [`Max`] from the annotation will be used to traverse the tree and is expected to
 /// be the maximum `K` contained in that sub-tree.
-pub enum KelvinMap<K, V, A, S>
+pub enum KelvinMap<K, V, A, S, const N: usize>
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
-    A: MapAnnotation<K, V, S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S>,
     S: Store,
 {
     /// Represents and empty endpoint
@@ -32,16 +36,16 @@ where
     /// Annotated node that will contain, at least, the maximum key value that exists within this
     /// sub-tree
     Node(
-        Annotated<KelvinMap<K, V, A, S>, S>,
-        Annotated<KelvinMap<K, V, A, S>, S>,
+        Annotated<KelvinMap<K, V, A, S, N>, S>,
+        Annotated<KelvinMap<K, V, A, S, N>, S>,
     ),
 }
 
-impl<K, V, A, S> Default for KelvinMap<K, V, A, S>
+impl<K, V, A, S, const N: usize> Default for KelvinMap<K, V, A, S, N>
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
-    A: MapAnnotation<K, V, S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S>,
     S: Store,
 {
     fn default() -> Self {
@@ -49,11 +53,11 @@ where
     }
 }
 
-impl<K, V, A, S> Compound<S> for KelvinMap<K, V, A, S>
+impl<K, V, A, S, const N: usize> Compound<S> for KelvinMap<K, V, A, S, N>
 where
     V: Canon<S>,
     K: Canon<S> + Ord,
-    A: MapAnnotation<K, V, S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S>,
     S: Store,
 {
     type Leaf = Leaf<K, V>;
@@ -85,11 +89,14 @@ fn borrow_max<K, A: Borrow<Max<K>>>(ann: &A) -> &Max<K> {
     ann.borrow()
 }
 
-impl<K, V, A, S> KelvinMap<K, V, A, S>
+impl<K, V, A, S, const N: usize> KelvinMap<K, V, A, S, N>
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
-    A: MapAnnotation<K, V, S>,
+    A: Canon<S>
+        + Annotation<KelvinMap<K, V, A, S, N>, S>
+        + Borrow<Cardinality>
+        + Borrow<Max<K>>,
     S: Store,
 {
     /// Returns the number of elements in the map.
@@ -119,48 +126,62 @@ where
         }
     }
 
-    /// Fetch a previously inserted key -> value mapping, provided the key.
+    /// Returns a reference to the value corresponding to the key
     ///
     /// Will return `Ok(None)` if no correspondent key was found.
-    pub fn get(&self, k: &K) -> Result<Option<V>, S::Error> {
-        match self {
-            KelvinMap::Empty => Ok(None),
-            KelvinMap::Leaf(l) if l == k => Ok(Some(l.value().clone())),
-            KelvinMap::Leaf(l) if l != k => Ok(None),
-            KelvinMap::Node(l, _) if borrow_max(l.annotation()) >= k => l.val()?.get(k),
-            KelvinMap::Node(l, r) if borrow_max(l.annotation()) < k => r.val()?.get(k),
-            _ => Err(InvalidEncoding.into()),
-        }
+    pub fn get<'a>(
+        &'a self,
+        k: &K,
+    ) -> Result<Option<impl Deref<Target = V> + 'a>, S::Error> {
+        Branch::<'a, _, _, N>::walk(self, |f| match f {
+            Walk::Leaf(l) => {
+                if l.key() == k {
+                    Step::Found(l)
+                } else {
+                    Step::Next
+                }
+            }
+            Walk::Node(n) => {
+                if borrow_max(n.annotation()) >= k {
+                    Step::Into(n)
+                } else {
+                    Step::Next
+                }
+            }
+        })
+        .map(|result| result.map(|branch| ValRef(branch)))
     }
 
-    /// Mutably map the value of a previously inserted key -> value mapping.
+    /// Returns a mutable reference to the value corresponding to the key
     ///
-    /// The provided `FnMut` will receive a mutable reference to the already found value and will
-    /// expect `R` as return.
-    ///
-    /// Any changes performed to this mutable reference will be stored on the map.
-    ///
-    /// If the key was not previously found and no valid value can be sent to `f`, then `Ok(None)`
-    /// will be returned.
-    pub fn map_mut<F, R>(&mut self, k: &K, mut f: F) -> Result<Option<R>, S::Error>
-    where
-        F: FnMut(&mut V) -> R,
-    {
-        match self {
-            KelvinMap::Empty => Ok(None),
-            KelvinMap::Leaf(l) if l == k => Ok(Some(f(l.value_mut()))),
-            KelvinMap::Leaf(l) if l != k => Ok(None),
-            KelvinMap::Node(l, _) if borrow_max(l.annotation()) >= k => l.val_mut()?.map_mut(k, f),
-            KelvinMap::Node(l, r) if borrow_max(l.annotation()) < k => r.val_mut()?.map_mut(k, f),
-            _ => Err(InvalidEncoding.into()),
-        }
+    /// Will return `Ok(None)` if no correspondent key was found.
+    pub fn get_mut<'a>(
+        &'a mut self,
+        k: &K,
+    ) -> Result<Option<impl DerefMut<Target = V> + 'a>, S::Error> {
+        BranchMut::<'a, _, _, N>::walk(self, |f| match f {
+            WalkMut::Leaf(l) => {
+                if l.key() == k {
+                    StepMut::Found(l)
+                } else {
+                    StepMut::Next
+                }
+            }
+            WalkMut::Node(n) => {
+                if borrow_max(n.annotation()) >= k {
+                    StepMut::Into(n)
+                } else {
+                    StepMut::Next
+                }
+            }
+        })
+        .map(|result| result.map(|branch| ValRefMut(branch)))
     }
 
     /// Traverse the tree to find the minimum leaf-key
     fn min_key_leaf(&self) -> Result<Option<Leaf<K, V>>, S::Error> {
         match self {
             KelvinMap::Empty => Ok(None),
-
             KelvinMap::Leaf(l) => Ok(Some(l.clone())),
 
             KelvinMap::Node(l, _) => l.val()?.min_key_leaf(),
@@ -171,9 +192,7 @@ where
     fn max_key_leaf(&self) -> Result<Option<Leaf<K, V>>, S::Error> {
         match self {
             KelvinMap::Empty => Ok(None),
-
             KelvinMap::Leaf(l) => Ok(Some(l.clone())),
-
             KelvinMap::Node(_, r) => r.val()?.max_key_leaf(),
         }
     }
@@ -231,30 +250,34 @@ where
         match self {
             KelvinMap::Empty => *self = KelvinMap::Leaf(leaf),
 
-            KelvinMap::Leaf(l) if *l == leaf => {
+            KelvinMap::Leaf(l) if l.key() == leaf.key() => {
                 old.replace(l.value().clone());
                 *self = KelvinMap::Leaf(leaf);
             }
 
-            KelvinMap::Leaf(l) if *l < leaf => {
+            KelvinMap::Leaf(l) if l.key() < leaf.key() => {
                 let left = Annotated::new(mem::take(self));
                 let right = Annotated::new(KelvinMap::Leaf(leaf));
 
                 *self = KelvinMap::Node(left, right);
             }
 
-            KelvinMap::Leaf(l) if leaf < *l => {
+            KelvinMap::Leaf(l) if leaf.key() < l.key() => {
                 let left = Annotated::new(KelvinMap::Leaf(leaf));
                 let right = Annotated::new(mem::take(self));
 
                 *self = KelvinMap::Node(left, right);
             }
 
-            KelvinMap::Node(l, _) if borrow_max(l.annotation()) >= leaf.key() => {
+            KelvinMap::Node(l, _)
+                if borrow_max(l.annotation()) >= leaf.key() =>
+            {
                 old = l.val_mut()?._insert(leaf)?;
             }
 
-            KelvinMap::Node(l, r) if borrow_max(l.annotation()) < leaf.key() => {
+            KelvinMap::Node(l, r)
+                if borrow_max(l.annotation()) < leaf.key() =>
+            {
                 old = r.val_mut()?._insert(leaf)?;
             }
 
@@ -329,5 +352,67 @@ where
                 }
             }
         }
+    }
+}
+
+/// Private struct used to hide the complex branch signature behind an
+/// `impl Deref<Target = V>` for returning references to values in the map
+struct ValRef<'a, K, V, A, S, const N: usize>(
+    Branch<'a, KelvinMap<K, V, A, S, N>, S, N>,
+)
+where
+    K: Canon<S> + Ord,
+    V: Canon<S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S>,
+    S: Store;
+
+impl<'a, K, V, A, S, const N: usize> Deref for ValRef<'a, K, V, A, S, N>
+where
+    K: Canon<S> + Ord,
+    V: Canon<S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S>,
+    S: Store,
+{
+    type Target = V;
+
+    fn deref(&self) -> &Self::Target {
+        &**self.0
+    }
+}
+
+/// Private struct used to hide the complex branch signature behind an
+/// `impl DerefMut<Target = V>` for returning mutable references to values in the map
+struct ValRefMut<'a, K, V, A, S, const N: usize>(
+    BranchMut<'a, KelvinMap<K, V, A, S, N>, S, N>,
+)
+where
+    K: Canon<S> + Ord,
+    V: Canon<S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S> + Borrow<Max<K>>,
+    S: Store;
+
+impl<'a, K, V, A, S, const N: usize> Deref for ValRefMut<'a, K, V, A, S, N>
+where
+    K: Canon<S> + Ord,
+    V: Canon<S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S> + Borrow<Max<K>>,
+    S: Store,
+{
+    type Target = V;
+
+    fn deref(&self) -> &Self::Target {
+        &**self.0
+    }
+}
+
+impl<'a, K, V, A, S, const N: usize> DerefMut for ValRefMut<'a, K, V, A, S, N>
+where
+    K: Canon<S> + Ord,
+    V: Canon<S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S> + Borrow<Max<K>>,
+    S: Store,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut **self.0
     }
 }

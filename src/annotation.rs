@@ -16,12 +16,12 @@ use core::marker::PhantomData;
 /// Trait requirement to be an annotation of `KelvinMap`.
 ///
 /// The borrowed `Max<K>` will be used to define the traversal path over the tree.
-pub trait MapAnnotation<K, V, S>
+pub trait MapAnnotation<K, V, S, const N: usize>
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
     S: Store,
-    Self: Canon<S> + Annotation<KelvinMap<K, V, Self, S>, S>,
+    Self: Canon<S> + Annotation<KelvinMap<K, V, Self, S, N>, S>,
     Self: Borrow<Max<K>> + Borrow<Cardinality>,
 {
 }
@@ -43,7 +43,8 @@ where
     store: PhantomData<S>,
 }
 
-impl<K, V, S> MapAnnotation<K, V, S> for MapAnnotationDefault<K, S>
+impl<K, V, S, const N: usize> MapAnnotation<K, V, S, N>
+    for MapAnnotationDefault<K, S>
 where
     K: Canon<S> + Ord + Default,
     V: Canon<S>,
@@ -71,7 +72,8 @@ where
     }
 }
 
-impl<K, V, S> Annotation<KelvinMap<K, V, MapAnnotationDefault<K, S>, S>, S>
+impl<K, V, S, const N: usize>
+    Annotation<KelvinMap<K, V, MapAnnotationDefault<K, S>, S, N>, S>
     for MapAnnotationDefault<K, S>
 where
     K: Canon<S> + Ord + Default,
@@ -80,7 +82,7 @@ where
 {
     fn identity() -> Self {
         let cardinality = <Cardinality as Annotation<
-            KelvinMap<K, V, MapAnnotationDefault<K, S>, S>,
+            KelvinMap<K, V, MapAnnotationDefault<K, S>, S, N>,
             S,
         >>::identity();
         let max = Max::Maximum(K::default());
@@ -94,13 +96,13 @@ where
 
     fn from_leaf(leaf: &Leaf<K, V>) -> Self {
         let cardinality = <Cardinality as Annotation<
-            KelvinMap<K, V, MapAnnotationDefault<K, S>, S>,
+            KelvinMap<K, V, MapAnnotationDefault<K, S>, S, N>,
             S,
         >>::from_leaf(leaf);
-        let max =
-            <Max<K> as Annotation<KelvinMap<K, V, MapAnnotationDefault<K, S>, S>, S>>::from_leaf(
-                leaf,
-            );
+        let max = <Max<K> as Annotation<
+            KelvinMap<K, V, MapAnnotationDefault<K, S>, S, N>,
+            S,
+        >>::from_leaf(leaf);
 
         Self {
             cardinality,
@@ -109,15 +111,17 @@ where
         }
     }
 
-    fn from_node(node: &KelvinMap<K, V, MapAnnotationDefault<K, S>, S>) -> Self {
+    fn from_node(
+        node: &KelvinMap<K, V, MapAnnotationDefault<K, S>, S, N>,
+    ) -> Self {
         let cardinality = <Cardinality as Annotation<
-            KelvinMap<K, V, MapAnnotationDefault<K, S>, S>,
+            KelvinMap<K, V, MapAnnotationDefault<K, S>, S, N>,
             S,
         >>::from_node(node);
-        let max =
-            <Max<K> as Annotation<KelvinMap<K, V, MapAnnotationDefault<K, S>, S>, S>>::from_node(
-                node,
-            );
+        let max = <Max<K> as Annotation<
+            KelvinMap<K, V, MapAnnotationDefault<K, S>, S, N>,
+            S,
+        >>::from_node(node);
 
         Self {
             cardinality,
