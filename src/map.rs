@@ -214,13 +214,13 @@ where
         if c_r > c_l.saturating_add(1) {
             // Find the smallest element in `r`, remove it and append to `l`
             if let Some(leaf) = r.val()?.min_key_leaf()? {
-                r.val_mut()?.remove(leaf.key())?;
+                r.val_mut()?._remove(leaf.key())?;
                 l.val_mut()?._insert(leaf)?;
             }
         } else if c_l > c_r.saturating_add(1) {
             // Find the biggest element in `l`, remove it and append to `r`
             if let Some(leaf) = l.val()?.max_key_leaf()? {
-                l.val_mut()?.remove(leaf.key())?;
+                l.val_mut()?._remove(leaf.key())?;
                 r.val_mut()?._insert(leaf)?;
             }
         }
@@ -299,6 +299,10 @@ where
     pub fn remove(&mut self, k: &K) -> Result<Option<V>, S::Error> {
         self.balance()?;
 
+        self._remove(k)
+    }
+
+    fn _remove(&mut self, k: &K) -> Result<Option<V>, S::Error> {
         match self {
             KelvinMap::Empty => Ok(None),
 
