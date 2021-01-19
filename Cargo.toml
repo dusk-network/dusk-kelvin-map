@@ -1,6 +1,6 @@
 [package]
 name = "dusk-kelvin-map"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Victor Lopez <victor@dusk.network>"]
 edition = "2018"
 description = "BST Map implementation with Microkelvin backend"
@@ -10,10 +10,11 @@ license = "MPL-2.0"
 categories = ["data-structures", "embedded", "no-std", "wasm"]
 
 [dependencies]
-microkelvin = "0.5" 
-canonical = "0.4"
-canonical_derive = "0.4"
+microkelvin = "0.5"
+canonical = "0.5"
+canonical_derive = "0.5"
 
 [dev-dependencies]
-canonical_host = "0.4"
+canonical_host = "0.5"
 rand = "0.7"
+
