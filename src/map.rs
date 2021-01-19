@@ -4,7 +4,7 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-use crate::{Leaf, MapAnnotation};
+use crate::Leaf;
 
 use core::borrow::Borrow;
 use core::mem;
