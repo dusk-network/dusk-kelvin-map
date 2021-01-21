@@ -15,7 +15,7 @@ use microkelvin::Cardinality;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 
-const MAX_DEPTH: usize = 16;
+const MAX_DEPTH: usize = 32;
 
 /// Simple key-value pair wrapper
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Canon)]
