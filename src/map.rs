@@ -22,11 +22,11 @@ use microkelvin::{
 ///
 /// The borrowed [`Max`] from the annotation will be used to traverse the tree and is expected to
 /// be the maximum `K` contained in that sub-tree.
-pub enum KelvinMap<K, V, A, S, const N: usize>
+pub enum KelvinMap<K, V, A, S>
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S>,
     S: Store,
 {
     /// Represents and empty endpoint
@@ -36,16 +36,16 @@ where
     /// Annotated node that will contain, at least, the maximum key value that exists within this
     /// sub-tree
     Node(
-        Annotated<KelvinMap<K, V, A, S, N>, S>,
-        Annotated<KelvinMap<K, V, A, S, N>, S>,
+        Annotated<KelvinMap<K, V, A, S>, S>,
+        Annotated<KelvinMap<K, V, A, S>, S>,
     ),
 }
 
-impl<K, V, A, S, const N: usize> Default for KelvinMap<K, V, A, S, N>
+impl<K, V, A, S> Default for KelvinMap<K, V, A, S>
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S>,
     S: Store,
 {
     fn default() -> Self {
@@ -53,11 +53,11 @@ where
     }
 }
 
-impl<K, V, A, S, const N: usize> Compound<S> for KelvinMap<K, V, A, S, N>
+impl<K, V, A, S> Compound<S> for KelvinMap<K, V, A, S>
 where
     V: Canon<S>,
     K: Canon<S> + Ord,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S>,
     S: Store,
 {
     type Leaf = Leaf<K, V>;
@@ -89,12 +89,12 @@ fn borrow_max<K, A: Borrow<Max<K>>>(ann: &A) -> &Max<K> {
     ann.borrow()
 }
 
-impl<K, V, A, S, const N: usize> KelvinMap<K, V, A, S, N>
+impl<K, V, A, S> KelvinMap<K, V, A, S>
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
     A: Canon<S>
-        + Annotation<KelvinMap<K, V, A, S, N>, S>
+        + Annotation<KelvinMap<K, V, A, S>, S>
         + Borrow<Cardinality>
         + Borrow<Max<K>>,
     S: Store,
@@ -133,7 +133,7 @@ where
         &'a self,
         k: &K,
     ) -> Result<Option<impl Deref<Target = V> + 'a>, S::Error> {
-        Branch::<'a, _, _, N>::walk(self, |f| match f {
+        Branch::<'a, _, _>::walk(self, |f| match f {
             Walk::Leaf(l) => {
                 if l.key() == k {
                     Step::Found(l)
@@ -159,7 +159,7 @@ where
         &'a mut self,
         k: &K,
     ) -> Result<Option<impl DerefMut<Target = V> + 'a>, S::Error> {
-        BranchMut::<'a, _, _, N>::walk(self, |f| match f {
+        BranchMut::<'a, _, _>::walk(self, |f| match f {
             WalkMut::Leaf(l) => {
                 if l.key() == k {
                     StepMut::Found(l)
@@ -357,20 +357,18 @@ where
 
 /// Private struct used to hide the complex branch signature behind an
 /// `impl Deref<Target = V>` for returning references to values in the map
-struct ValRef<'a, K, V, A, S, const N: usize>(
-    Branch<'a, KelvinMap<K, V, A, S, N>, S, N>,
-)
+struct ValRef<'a, K, V, A, S>(Branch<'a, KelvinMap<K, V, A, S>, S>)
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S>,
     S: Store;
 
-impl<'a, K, V, A, S, const N: usize> Deref for ValRef<'a, K, V, A, S, N>
+impl<'a, K, V, A, S> Deref for ValRef<'a, K, V, A, S>
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S>,
     S: Store,
 {
     type Target = V;
@@ -382,20 +380,18 @@ where
 
 /// Private struct used to hide the complex branch signature behind an
 /// `impl DerefMut<Target = V>` for returning mutable references to values in the map
-struct ValRefMut<'a, K, V, A, S, const N: usize>(
-    BranchMut<'a, KelvinMap<K, V, A, S, N>, S, N>,
-)
+struct ValRefMut<'a, K, V, A, S>(BranchMut<'a, KelvinMap<K, V, A, S>, S>)
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S> + Borrow<Max<K>>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
     S: Store;
 
-impl<'a, K, V, A, S, const N: usize> Deref for ValRefMut<'a, K, V, A, S, N>
+impl<'a, K, V, A, S> Deref for ValRefMut<'a, K, V, A, S>
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S> + Borrow<Max<K>>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
     S: Store,
 {
     type Target = V;
@@ -405,11 +401,11 @@ where
     }
 }
 
-impl<'a, K, V, A, S, const N: usize> DerefMut for ValRefMut<'a, K, V, A, S, N>
+impl<'a, K, V, A, S> DerefMut for ValRefMut<'a, K, V, A, S>
 where
     K: Canon<S> + Ord,
     V: Canon<S>,
-    A: Canon<S> + Annotation<KelvinMap<K, V, A, S, N>, S> + Borrow<Max<K>>,
+    A: Canon<S> + Annotation<KelvinMap<K, V, A, S>, S> + Borrow<Max<K>>,
     S: Store,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
