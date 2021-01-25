@@ -21,5 +21,4 @@ mod map;
 mod tests;
 
 /// [`KelvinMap`] default implementation using the minimal [`MapAnnotation`]
-pub type Map<K, V, S, const N: usize> =
-    KelvinMap<K, V, MapAnnotationDefault<K, S>, S, N>;
+pub type Map<K, V, S> = KelvinMap<K, V, MapAnnotationDefault<K, S>, S>;

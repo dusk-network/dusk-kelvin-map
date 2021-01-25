@@ -15,8 +15,6 @@ use microkelvin::Cardinality;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 
-const MAX_DEPTH: usize = 32;
-
 /// Simple key-value pair wrapper
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Canon)]
 struct KeyValue {
@@ -32,8 +30,8 @@ impl KeyValue {
         }
     }
 
-    fn generate_map<const L: usize>(
-    ) -> (Vec<KeyValue>, Map<u64, u32, MemStore, MAX_DEPTH>) {
+    fn generate_map<const L: usize>() -> (Vec<KeyValue>, Map<u64, u32, MemStore>)
+    {
         // This seed will not generate duplicates
         let mut rng = StdRng::seed_from_u64(2321u64);
         let mut map = Map::default();
@@ -54,7 +52,7 @@ impl KeyValue {
     }
 }
 
-fn assert_balanced<K, V, S, const N: usize>(map: &Map<K, V, S, N>)
+fn assert_balanced<K, V, S>(map: &Map<K, V, S>)
 where
     K: Canon<S> + Ord + Default,
     V: Canon<S>,
@@ -81,7 +79,7 @@ where
 fn insert_get_mut() {
     let n = 16;
 
-    let mut map: Map<u64, u64, MemStore, MAX_DEPTH> = Map::default();
+    let mut map: Map<u64, u64, MemStore> = Map::default();
 
     for i in 0..n {
         map.insert(i, i).unwrap();
@@ -102,7 +100,7 @@ fn insert_get_mut() {
 fn remove_null() {
     // This seed will not generate duplicates
     let mut rng = StdRng::seed_from_u64(2321u64);
-    let mut map: Map<u64, u32, MemStore, MAX_DEPTH> = Map::default();
+    let mut map: Map<u64, u32, MemStore> = Map::default();
 
     let kv = KeyValue::random(&mut rng);
     assert_eq!(Ok(None), map.remove(&kv.key));
@@ -139,7 +137,7 @@ fn remove_multiple() {
 
 #[test]
 fn balance() {
-    let mut map: Map<u8, u8, MemStore, MAX_DEPTH> = Map::default();
+    let mut map: Map<u8, u8, MemStore> = Map::default();
 
     // Ordered inserting is a worst case scenario for a BST
     for v in 0..130 {
@@ -151,7 +149,7 @@ fn balance() {
 
 #[test]
 fn balance_rev() {
-    let mut map: Map<u8, u8, MemStore, MAX_DEPTH> = Map::default();
+    let mut map: Map<u8, u8, MemStore> = Map::default();
 
     // Reverse order inserting is a worst case scenario for a BST
     for v in 0..130 {
