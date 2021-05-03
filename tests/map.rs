@@ -4,16 +4,14 @@
 //
 // Copyright (c) DUSK NETWORK. All rights reserved.
 
-use crate::{KelvinMap, Map};
-
-use core::borrow::Borrow;
-
-use canonical::{Canon, Store};
+use canonical::Canon;
 use canonical_derive::Canon;
-use canonical_host::MemStore;
+use dusk_kelvin_map::{KelvinMap, Map};
 use microkelvin::Cardinality;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
+
+use core::borrow::Borrow;
 
 /// Simple key-value pair wrapper
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Canon)]
@@ -30,8 +28,7 @@ impl KeyValue {
         }
     }
 
-    fn generate_map<const L: usize>() -> (Vec<KeyValue>, Map<u64, u32, MemStore>)
-    {
+    fn generate_map<const L: usize>() -> (Vec<KeyValue>, Map<u64, u32>) {
         // This seed will not generate duplicates
         let mut rng = StdRng::seed_from_u64(2321u64);
         let mut map = Map::default();
@@ -44,19 +41,26 @@ impl KeyValue {
         }
 
         data.iter().for_each(|d| {
-            assert!(map.insert(d.key, d.value).unwrap().is_none());
-            assert_eq!(d.value, *map.get(&d.key).unwrap().unwrap());
+            assert!(map
+                .insert(d.key, d.value)
+                .expect("Failed to insert a KV")
+                .is_none());
+            assert_eq!(
+                d.value,
+                *map.get(&d.key)
+                    .expect("Failed to fetch an inserted KV")
+                    .expect("The inserted KV was not found")
+            );
         });
 
         (data, map)
     }
 }
 
-fn assert_balanced<K, V, S>(map: &Map<K, V, S>)
+fn assert_balanced<K, V>(map: &Map<K, V>)
 where
-    K: Canon<S> + Ord + Default,
-    V: Canon<S>,
-    S: Store,
+    K: Canon + Ord + Default,
+    V: Canon,
 {
     let (l, r) = match map {
         KelvinMap::Node(l, r) => (l, r),
@@ -79,20 +83,27 @@ where
 fn insert_get_mut() {
     let n = 16;
 
-    let mut map: Map<u64, u64, MemStore> = Map::default();
+    let mut map: Map<u64, u64> = Map::default();
 
     for i in 0..n {
-        map.insert(i, i).unwrap();
+        map.insert(i, i).expect("Failed to insert new KV");
     }
 
     for i in 0..n {
-        *map.get_mut(&i).unwrap().unwrap() += 1;
+        *map.get_mut(&i)
+            .expect("Failed to fetch previously inserted KV")
+            .expect("Previously inserted KV not found") += 1;
     }
 
     assert_balanced(&map);
 
     for i in 0..n {
-        assert_eq!(*map.get(&i).unwrap().unwrap(), i + 1)
+        assert_eq!(
+            *map.get(&i)
+                .expect("Failed to fetch previously inserted KV")
+                .expect("Previously inserted KV not found"),
+            i + 1
+        )
     }
 }
 
@@ -100,20 +111,28 @@ fn insert_get_mut() {
 fn remove_null() {
     // This seed will not generate duplicates
     let mut rng = StdRng::seed_from_u64(2321u64);
-    let mut map: Map<u64, u32, MemStore> = Map::default();
+    let mut map: Map<u64, u32> = Map::default();
 
     let kv = KeyValue::random(&mut rng);
-    assert_eq!(Ok(None), map.remove(&kv.key));
+    let result = map
+        .remove(&kv.key)
+        .expect("Failed to remove unexisting key");
+    assert!(result.is_none());
 }
 
 #[test]
 fn remove_single() {
     let (data, mut map) = KeyValue::generate_map::<1>();
 
-    let v = map.remove(&data[0].key).unwrap().unwrap();
+    let v = map.remove(&data[0].key)
+        .expect("Failed to remove a previously inserted KV")
+        .expect("The removal of a previously inserted KV is expected to be returned");
     assert_eq!(data[0].value, v);
 
-    assert!(map.remove(&data[0].key).unwrap().is_none());
+    assert!(map
+        .remove(&data[0].key)
+        .expect("Failed to remove a non-existing KV")
+        .is_none());
     assert!(map.is_empty());
 }
 
@@ -126,10 +145,15 @@ fn remove_multiple() {
 
     let mut k = (L - 2) as usize;
     while k > 0 {
-        let v = map.remove(&data[k].key).unwrap().unwrap();
+        let v = map.remove(&data[k].key)
+            .expect("Failed to remove a previously inserted KV")
+            .expect("The removal of a previously inserted KV is expected to be returned");
 
         assert_eq!(data[k].value, v);
-        assert!(map.remove(&data[k].key).unwrap().is_none());
+        assert!(map
+            .remove(&data[k].key)
+            .expect("Failed to remove an unexisting KV")
+            .is_none());
 
         k /= 2;
     }
@@ -137,11 +161,12 @@ fn remove_multiple() {
 
 #[test]
 fn balance() {
-    let mut map: Map<u8, u8, MemStore> = Map::default();
+    let mut map: Map<u8, u8> = Map::default();
 
     // Ordered inserting is a worst case scenario for a BST
     for v in 0..130 {
-        map.insert(v, v.wrapping_mul(3)).unwrap();
+        map.insert(v, v.wrapping_mul(3))
+            .expect("Failed to insert a KV");
     }
 
     assert_balanced(&map);
@@ -149,11 +174,12 @@ fn balance() {
 
 #[test]
 fn balance_rev() {
-    let mut map: Map<u8, u8, MemStore> = Map::default();
+    let mut map: Map<u8, u8> = Map::default();
 
     // Reverse order inserting is a worst case scenario for a BST
     for v in 0..130 {
-        map.insert(130 - v, v.wrapping_mul(3)).unwrap();
+        map.insert(130 - v, v.wrapping_mul(3))
+            .expect("Failed to insert a KV");
     }
 
     assert_balanced(&map);

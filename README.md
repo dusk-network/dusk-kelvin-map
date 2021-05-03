@@ -14,11 +14,10 @@ This implementation uses Microkelvin as backend and is optimized to work under c
 ## Example
 
 ```rust
-use canonical_host::MemStore;
 use dusk_kelvin_map::Map;
 
 // Create a new map u64 -> u32 that will use MemStore as storage backend.
-let mut map: Map<u64, u32, MemStore> = Map::default();
+let mut map: Map<u64, u32> = Map::default();
 
 // Insert a new mapping 2 -> 4
 map.insert(2, 4).expect("Failed to insert data.");
