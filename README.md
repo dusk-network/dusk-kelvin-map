@@ -3,6 +3,8 @@
 
 # Dusk Kelvin Map
 
+#### NOTE: This crate is deprecated in favor of [dusk-hamt](https://crates.io/crates/dusk-hamt)
+
 Binary search tree implementation with no associated value on the nodes.
 
 It will extend the standard properties of a default BST.
