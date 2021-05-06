@@ -7,8 +7,8 @@
 use core::borrow::Borrow;
 use core::ops::{Deref, DerefMut};
 
-use canonical::Canon;
 use canonical_derive::Canon;
+use microkelvin::Keyed;
 
 #[derive(Debug, Clone, Canon)]
 /// Wrapper for the key -> value mapping the will act as leaf of the tree
@@ -25,8 +25,8 @@ where
         Self { key, value }
     }
 
-    /// Stored key of the key -> value mapping
-    pub fn key(&self) -> &K {
+    /// Stored key of the key -> value mapping as concrete representation
+    pub(crate) fn _key(&self) -> &K {
         &self.key
     }
 
@@ -38,6 +38,15 @@ where
     /// Mutable reference to the stored value of the key -> value mapping
     pub fn value_mut(&mut self) -> &mut V {
         &mut self.value
+    }
+}
+
+impl<K, V> Keyed<K> for Leaf<K, V>
+where
+    K: Ord,
+{
+    fn key(&self) -> &K {
+        &self.key
     }
 }
 
