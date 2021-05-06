@@ -6,125 +6,87 @@
 
 use crate::{KelvinMap, Leaf};
 
-use canonical::{Canon, Store};
+use canonical::Canon;
 use canonical_derive::Canon;
-use microkelvin::{Annotation, Cardinality, Max};
+use microkelvin::{Annotation, Cardinality, Combine, MaxKey};
 
 use core::borrow::Borrow;
-use core::marker::PhantomData;
 
 /// Trait requirement to be an annotation of `KelvinMap`.
 ///
 /// The borrowed `Max<K>` will be used to define the traversal path over the tree.
-pub trait MapAnnotation<K, V, S>
+pub trait MapAnnotation<K, V>
 where
-    K: Canon<S> + Ord,
-    V: Canon<S>,
-    S: Store,
-    Self: Canon<S> + Annotation<KelvinMap<K, V, Self, S>, S>,
-    Self: Borrow<Max<K>> + Borrow<Cardinality>,
+    K: Canon + Ord,
+    V: Canon,
+    Self: Canon + Annotation<Leaf<K, V>> + Combine<KelvinMap<K, V, Self>, Self>,
+    Self: Borrow<MaxKey<K>> + Borrow<Cardinality>,
 {
 }
 
-#[derive(Debug, Clone, Canon)]
+#[derive(Debug, Clone, Default, Canon)]
 /// Minimum working annotation for the KelvinMap.
 ///
 /// Internally contains a [`Max`] implementation for `K`.
 ///
 /// The `Default` implementation of `K` will be considered as the negative infinity for the `Max`
 /// annotation.
-pub struct MapAnnotationDefault<K, S>
+pub struct MapAnnotationDefault<K>
 where
-    K: Canon<S> + Ord + Default,
-    S: Store,
+    K: Canon + Ord + Default,
 {
     cardinality: Cardinality,
-    max: Max<K>,
-    store: PhantomData<S>,
+    max: MaxKey<K>,
 }
 
-impl<K, V, S> MapAnnotation<K, V, S> for MapAnnotationDefault<K, S>
+impl<K> Borrow<MaxKey<K>> for MapAnnotationDefault<K>
 where
-    K: Canon<S> + Ord + Default,
-    V: Canon<S>,
-    S: Store,
+    K: Canon + Ord + Default,
 {
-}
-
-impl<K, S> Borrow<Max<K>> for MapAnnotationDefault<K, S>
-where
-    K: Canon<S> + Ord + Default,
-    S: Store,
-{
-    fn borrow(&self) -> &Max<K> {
+    fn borrow(&self) -> &MaxKey<K> {
         &self.max
     }
 }
 
-impl<K, S> Borrow<Cardinality> for MapAnnotationDefault<K, S>
+impl<K> Borrow<Cardinality> for MapAnnotationDefault<K>
 where
-    K: Canon<S> + Ord + Default,
-    S: Store,
+    K: Canon + Ord + Default,
 {
     fn borrow(&self) -> &Cardinality {
         &self.cardinality
     }
 }
 
-impl<K, V, S> Annotation<KelvinMap<K, V, MapAnnotationDefault<K, S>, S>, S>
-    for MapAnnotationDefault<K, S>
+impl<K, V> Annotation<Leaf<K, V>> for MapAnnotationDefault<K>
 where
-    K: Canon<S> + Ord + Default,
-    V: Canon<S>,
-    S: Store,
+    K: Canon + Ord + Default,
 {
-    fn identity() -> Self {
-        let cardinality = <Cardinality as Annotation<
-            KelvinMap<K, V, MapAnnotationDefault<K, S>, S>,
-            S,
-        >>::identity();
-        let max = Max::Maximum(K::default());
-
-        Self {
-            cardinality,
-            max,
-            store: PhantomData,
-        }
-    }
-
     fn from_leaf(leaf: &Leaf<K, V>) -> Self {
-        let cardinality = <Cardinality as Annotation<
-            KelvinMap<K, V, MapAnnotationDefault<K, S>, S>,
-            S,
-        >>::from_leaf(leaf);
-        let max = <Max<K> as Annotation<
-            KelvinMap<K, V, MapAnnotationDefault<K, S>, S>,
-            S,
-        >>::from_leaf(leaf);
+        let cardinality = Cardinality::from_leaf(leaf);
+        let max = MaxKey::from_leaf(leaf);
 
-        Self {
-            cardinality,
-            max,
-            store: PhantomData,
-        }
+        Self { cardinality, max }
     }
+}
 
-    fn from_node(
-        node: &KelvinMap<K, V, MapAnnotationDefault<K, S>, S>,
-    ) -> Self {
-        let cardinality = <Cardinality as Annotation<
-            KelvinMap<K, V, MapAnnotationDefault<K, S>, S>,
-            S,
-        >>::from_node(node);
-        let max = <Max<K> as Annotation<
-            KelvinMap<K, V, MapAnnotationDefault<K, S>, S>,
-            S,
-        >>::from_node(node);
+impl<K, V>
+    Combine<KelvinMap<K, V, MapAnnotationDefault<K>>, MapAnnotationDefault<K>>
+    for MapAnnotationDefault<K>
+where
+    K: Canon + Ord + Default,
+    V: Canon,
+{
+    fn combine(node: &KelvinMap<K, V, MapAnnotationDefault<K>>) -> Self {
+        let cardinality = Cardinality::combine(node);
+        let max = MaxKey::combine(node);
 
-        Self {
-            cardinality,
-            max,
-            store: PhantomData,
-        }
+        Self { cardinality, max }
     }
+}
+
+impl<K, V> MapAnnotation<K, V> for MapAnnotationDefault<K>
+where
+    K: Canon + Ord + Default,
+    V: Canon,
+{
 }

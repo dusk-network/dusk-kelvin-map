@@ -8,6 +8,7 @@
 #![feature(external_doc)]
 #![doc(include = "../README.md")]
 #![warn(missing_docs)]
+#![feature(ordering_helpers)]
 
 pub use annotation::{MapAnnotation, MapAnnotationDefault};
 pub use leaf::Leaf;
@@ -17,8 +18,5 @@ mod annotation;
 mod leaf;
 mod map;
 
-#[cfg(test)]
-mod tests;
-
 /// [`KelvinMap`] default implementation using the minimal [`MapAnnotation`]
-pub type Map<K, V, S> = KelvinMap<K, V, MapAnnotationDefault<K, S>, S>;
+pub type Map<K, V> = KelvinMap<K, V, MapAnnotationDefault<K>>;

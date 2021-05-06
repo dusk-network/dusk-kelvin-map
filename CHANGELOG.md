@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 06-25-21
+### Changed
+- Update canonical from `v0.5` to `v0.6` [#14](https://github.com/dusk-network/dusk-kelvin-map/issues/14)
+- Deprecate the crate in favor of `dusk-hamt`
+
 ## [0.3.0] - 25-01-21
 ### Changed
 - Create an internal `_remove` method, which does not call to `balance`, avoiding unnecessary recursion.
